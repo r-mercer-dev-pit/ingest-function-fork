@@ -1,21 +1,17 @@
 # ingest-function
 
-A Python-based data ingestion function designed to reliably pull data from external sources and load it into a target data store. Built with a serverless-first mindset, it can be deployed as an Azure Function, AWS Lambda, or run standalone in any Python environment.
+A Python function, callable by an AI Agent, that ingests documents and returns clear, concise summaries.
 
 ---
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
 - [Features](#features)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Configuration](#configuration)
-- [Running the Function](#running-the-function)
-- [Testing](#testing)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
 - [Project Structure](#project-structure)
+- [Running Tests](#running-tests)
 - [Development Workflow](#development-workflow)
 - [GitHub Codespaces](#github-codespaces)
 - [GitHub Spark](#github-spark)
@@ -24,140 +20,86 @@ A Python-based data ingestion function designed to reliably pull data from exter
 
 ---
 
-## Overview
-
-`ingest-function` is a lightweight, extensible ingestion pipeline component. It is responsible for:
-
-- Fetching raw data from one or more upstream sources (APIs, files, queues, databases)
-- Applying basic validation and transformation
-- Writing processed records to a downstream data store (blob storage, database, data warehouse)
-- Emitting structured logs and metrics for observability
-
-The function is stateless by design, making it easy to scale horizontally and deploy to any serverless runtime.
-
----
-
-## Architecture
-
-```
-┌─────────────────────┐        ┌───────────────────────┐        ┌────────────────────┐
-│   Upstream Source   │──────▶ │   ingest-function      │──────▶ │  Target Data Store │
-│  (API / Queue / DB) │        │  (validate, transform) │        │ (Blob / DB / DW)   │
-└─────────────────────┘        └───────────────────────┘        └────────────────────┘
-                                          │
-                                          ▼
-                                ┌─────────────────────┐
-                                │  Logging & Metrics  │
-                                │  (App Insights / CW)│
-                                └─────────────────────┘
-```
-
-The function follows a simple three-stage pipeline:
-
-1. **Extract** — connect to the upstream source and retrieve raw records
-2. **Transform** — validate, clean, and shape records to the target schema
-3. **Load** — write transformed records to the downstream store and emit a summary
-
----
-
 ## Features
 
-- ⚡ **Serverless-ready** — deploys to Azure Functions, AWS Lambda, or runs as a standalone script
-- 🔄 **Idempotent ingestion** — duplicate records are detected and skipped
-- 🔍 **Schema validation** — input records are validated before loading
-- 📊 **Structured logging** — JSON logs for easy querying in any observability platform
-- 🧪 **Fully testable** — pure Python core with no framework lock-in
-- 🔒 **Secrets management** — credentials loaded from environment variables or a secrets manager (never hardcoded)
+| Input type | Description |
+|------------|-------------|
+| `pdf` | Raw PDF bytes **or** a file path to a `.pdf` file |
+| `email` | Raw email message (RFC 2822 / MIME) as `str` or `bytes` |
+| `text` | Plain copy-pasted text (`str`) |
+
+| Output format | Description |
+|---------------|-------------|
+| `text` | Plain-text summary with a header/footer (default) |
+| `email` | Plain-text email message containing the summary |
+
+Summarisation is powered by the **OpenAI Chat Completions API** (`gpt-4o-mini` by default).
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- Python 3.11 or higher
-- `pip` or [`uv`](https://github.com/astral-sh/uv) (recommended)
-- Access credentials for your upstream source and target store
-
-### Installation
+## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/r-mercer/ingest-function.git
-cd ingest-function
-
-# Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Or with uv (faster)
-uv sync
-```
-
-### Configuration
-
-All configuration is provided via environment variables. Copy the example file and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-| Variable | Description | Required |
-|---|---|---|
-| `SOURCE_URL` | URL or connection string for the upstream source | ✅ |
-| `SOURCE_API_KEY` | API key for the upstream source | ✅ |
-| `TARGET_CONNECTION_STRING` | Connection string for the target data store | ✅ |
-| `TARGET_CONTAINER` | Container / table / bucket name in the target store | ✅ |
-| `BATCH_SIZE` | Number of records to process per invocation (default: `500`) | ❌ |
-| `LOG_LEVEL` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` (default: `INFO`) | ❌ |
-
-> **Never commit `.env` to source control.** It is already listed in `.gitignore`.
-
----
-
-## Running the Function
-
-### Locally (standalone)
-
-```bash
-python -m ingest_function
-```
-
-### With Azure Functions Core Tools
-
-```bash
-func start
-```
-
-### With Docker
-
-```bash
-docker build -t ingest-function .
-docker run --env-file .env ingest-function
 ```
 
 ---
 
-## Testing
+## Configuration
+
+Set the `OPENAI_API_KEY` environment variable before calling the function:
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=ingest_function --cov-report=term-missing
-
-# Run linter
-ruff check .
-
-# Run type checker
-mypy ingest_function/
+export OPENAI_API_KEY="sk-..."
 ```
 
-Tests live in the `tests/` directory and follow the `test_<module>.py` naming convention. Unit tests use `pytest` with `unittest.mock` for dependency isolation.
+---
+
+## Usage
+
+```python
+from ingest_function import summarize_document
+
+# Summarise copy-pasted text → plain text output
+result = summarize_document(
+    content="The quarterly report shows a 12% increase in revenue...",
+    input_type="text",
+    output_format="text",
+)
+print(result)
+
+# Summarise a PDF file → email output
+result = summarize_document(
+    content="/path/to/report.pdf",
+    input_type="pdf",
+    output_format="email",
+    recipient_email="alice@example.com",
+)
+print(result)
+
+# Summarise a raw email message → plain text output
+with open("message.eml", "rb") as f:
+    raw_email = f.read()
+
+result = summarize_document(
+    content=raw_email,
+    input_type="email",
+    output_format="text",
+)
+print(result)
+```
+
+### `summarize_document` parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `content` | `str \| bytes` | *required* | Document content (see Input types above) |
+| `input_type` | `"pdf" \| "email" \| "text"` | *required* | Format of the input document |
+| `output_format` | `"text" \| "email"` | `"text"` | Desired output format |
+| `recipient_email` | `str` | `""` | `To:` address (email output only) |
+| `sender_name` | `str` | `"Document Summary Service"` | `From:` name (email output only) |
+| `email_subject` | `str` | `"Document Summary"` | Subject line (email output only) |
+| `model` | `str` | `"gpt-4o-mini"` | OpenAI model used for summarisation |
 
 ---
 
@@ -165,23 +107,34 @@ Tests live in the `tests/` directory and follow the `test_<module>.py` naming co
 
 ```
 ingest-function/
-├── ingest_function/        # Main package
-│   ├── __init__.py
-│   ├── __main__.py         # Entry point for `python -m ingest_function`
-│   ├── extractor.py        # Upstream source connection & data fetch
-│   ├── transformer.py      # Validation and schema mapping
-│   ├── loader.py           # Target store writes
-│   └── config.py           # Environment variable loading
+├── ingest_function/
+│   ├── __init__.py          # Public API (summarize_document)
+│   ├── ingest.py            # Main entry point
+│   ├── summarizer.py        # OpenAI-powered summarisation
+│   ├── extractors/
+│   │   ├── __init__.py
+│   │   ├── pdf_extractor.py    # PDF → text (pypdf)
+│   │   ├── email_extractor.py  # Email → text (stdlib email)
+│   │   └── text_extractor.py   # Plain text passthrough
+│   └── formatters/
+│       ├── __init__.py
+│       ├── email_formatter.py  # Summary → email message
+│       └── text_formatter.py   # Summary → plain text
 ├── tests/
-│   ├── test_extractor.py
-│   ├── test_transformer.py
-│   └── test_loader.py
+│   └── test_ingest.py       # Unit tests
 ├── .devcontainer/
-│   └── devcontainer.json   # GitHub Codespaces configuration
-├── .env.example            # Example environment variable file
+│   └── devcontainer.json    # GitHub Codespaces configuration
 ├── .gitignore
-├── pyproject.toml          # Project metadata, dependencies, tool config
+├── requirements.txt
 └── README.md
+```
+
+---
+
+## Running Tests
+
+```bash
+pytest tests/
 ```
 
 ---
@@ -190,13 +143,9 @@ ingest-function/
 
 1. **Branch** — create a feature branch from `main`
 2. **Code** — make changes in the relevant module
-3. **Lint** — run `ruff check .` and fix any issues
-4. **Type-check** — run `mypy ingest_function/`
-5. **Test** — run `pytest` and ensure all tests pass
-6. **Commit** — write a descriptive commit message
-7. **Pull Request** — open a PR; CI will run lint, type-check, and tests automatically
-
-Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, etc.).
+3. **Test** — run `pytest tests/` and ensure all tests pass
+4. **Commit** — write a descriptive commit message
+5. **Pull Request** — open a PR with a clear description of what and why
 
 ---
 
@@ -213,10 +162,8 @@ The repository includes a `.devcontainer/devcontainer.json` that gives you a ful
 The Codespace will automatically:
 
 - Provision a container with Python 3.11
-- Install all project dependencies via `uv sync` (or `pip install -r requirements.txt`)
+- Install all project dependencies from `requirements.txt`
 - Install recommended VS Code extensions (Pylance, Ruff, Python Test Explorer)
-- Set up `pre-commit` hooks for linting and formatting
-- Forward any necessary ports for local function execution
 
 ### Recommended Extensions (pre-installed in Codespace)
 
@@ -227,54 +174,48 @@ The Codespace will automatically:
 | `charliermarsh.ruff` | Lint & format on save |
 | `ms-python.mypy-type-checker` | Inline type-checking |
 | `hbenl.vscode-test-explorer` | Test Explorer UI |
-| `ms-azuretools.vscode-azurefunctions` | Azure Functions local dev & deploy |
+| `GitHub.copilot` | AI-assisted code completion |
+| `GitHub.copilot-chat` | In-editor AI chat |
 
 ### Tips for Codespaces
 
-- Use **Codespace Secrets** (under your GitHub profile → Codespaces → Secrets) to store `SOURCE_API_KEY`, `TARGET_CONNECTION_STRING`, and other sensitive values. They are automatically injected as environment variables.
-- Pin a specific machine type (4-core recommended) under repository Codespace settings to ensure consistent performance.
-- Use the **Ports** panel to expose the Azure Functions local runtime port (`7071`) for browser-based testing.
-- Commit the `.devcontainer/devcontainer.json` to keep the environment reproducible for all contributors.
+- Use **Codespace Secrets** (your GitHub profile → Settings → Codespaces → Secrets) to store your `OPENAI_API_KEY`. It will be automatically injected as an environment variable when the Codespace starts.
+- Pin a specific machine type (4-core recommended) under repository Codespace settings for consistent performance.
+- Commit `.devcontainer/devcontainer.json` to keep the environment reproducible for all contributors.
 
 ---
 
 ## GitHub Spark
 
-[GitHub Spark](https://githubnext.com/projects/github-spark) is an AI-powered micro-app builder that lets you create small, focused tools that live alongside your repository. The following areas of this project are well-suited to Spark micro-apps:
+[GitHub Spark](https://githubnext.com/projects/github-spark) is an AI-powered micro-app builder that lets you create small, focused tools that live alongside your repository. Several areas of this project are well-suited to Spark micro-apps:
 
 ### Suggested Spark Applications
 
-#### 1. Ingestion Dashboard
-A lightweight read-only dashboard that queries your target data store and displays:
-- Total records ingested (today / this week / all time)
-- Last successful run timestamp and record count
-- Error rate trend chart
+#### 1. Document Summarisation UI
+A simple form where a user can paste text or a URL and immediately receive a plain-text or email-formatted summary — no CLI knowledge required.
 
-**Why Spark?** Spark excels at building small data-display apps with minimal boilerplate. A simple SQL or REST query → table/chart UI is exactly its sweet spot.
+**Why Spark?** The entire interaction is a single function call (`summarize_document`). Spark's AI assistance can wire up a clean input/output form in minutes with no deployment overhead.
 
-#### 2. Schema Explorer
-An interactive tool that lets you paste or upload a sample JSON payload and instantly see:
-- Auto-detected field types
-- Validation rules that would be applied by the transformer
-- A diff view comparing the sample against the current expected schema
+#### 2. Summarisation History Log
+A read-only dashboard that displays recent summarisation requests: input type, output format, token usage, and the generated summary — useful for auditing or demos.
 
-**Why Spark?** The UI is entirely client-side (no backend deployment needed), and Spark's AI assistance can generate the schema-comparison logic quickly.
+**Why Spark?** A simple table/card layout backed by a lightweight log file or storage endpoint is exactly the kind of small data-display app Spark handles well.
 
-#### 3. Run Trigger UI
-A simple form-based interface to manually trigger the ingest function with custom parameters (date range, batch size, source override) without needing CLI access. Useful for on-call engineers or non-technical stakeholders.
+#### 3. Prompt Tuner
+An interactive playground where you can adjust the summarisation prompt, change the model (`gpt-4o-mini`, `gpt-4o`, etc.), and compare outputs side-by-side without touching the codebase.
 
-**Why Spark?** Replaces a curl/CLI command with a safe, discoverable UI that can be shared with anyone who has repository access.
+**Why Spark?** Iterating on prompt text benefits from a tight feedback loop. Spark lets you build a quick compare-UI without spinning up a separate app.
 
-#### 4. Environment Variable Validator
-A Spark app that reads the `.env.example` file, presents a checklist of required variables, and lets you paste in values to validate format (URL syntax, key length, etc.) before adding them as Codespace or Actions secrets.
+#### 4. API Key Validator
+A simple tool that accepts an OpenAI API key, makes a lightweight test call, and confirms the key is valid and has sufficient quota — useful during onboarding.
 
-**Why Spark?** A zero-deployment helper that reduces onboarding friction with no infrastructure needed.
+**Why Spark?** A zero-deployment helper that reduces "why isn't it working?" friction for new contributors.
 
 ### How to Create a Spark App for This Project
 
 1. Navigate to [https://githubnext.com/projects/github-spark](https://githubnext.com/projects/github-spark) and sign in with your GitHub account
-2. Click **New Spark** and describe the app in natural language (e.g. *"Show me a table of the last 50 ingest runs from this Azure Table Storage account"*)
-3. Iterate with the AI editor — paste in your schema, adjust the layout, add filters
+2. Click **New Spark** and describe the app in natural language (e.g. *"Build a form that lets me paste text and get a summary using the OpenAI API"*)
+3. Iterate with the AI editor — paste in your function signature, adjust the layout, add input validation
 4. **Share** the Spark app URL with your team — no deployment required
 5. Optionally, embed the Spark app URL in this README or in a GitHub Issue template for discoverability
 
@@ -286,7 +227,7 @@ Contributions are welcome! Please follow these steps:
 
 1. Fork the repository and create a branch: `git checkout -b feat/your-feature`
 2. Make your changes and add tests
-3. Ensure `ruff check .`, `mypy ingest_function/`, and `pytest` all pass
+3. Ensure `pytest tests/` passes
 4. Open a Pull Request with a clear description of what and why
 
 Please be respectful and constructive in all interactions.
@@ -296,3 +237,4 @@ Please be respectful and constructive in all interactions.
 ## License
 
 This project is licensed under the MIT License.
+
