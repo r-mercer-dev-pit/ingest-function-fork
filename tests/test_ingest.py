@@ -2,23 +2,20 @@
 
 from __future__ import annotations
 
-import email as _email
-import io
-import textwrap
-import types
 import unittest
-from unittest.mock import MagicMock, patch
-
+from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
 # Extractor tests
 # ---------------------------------------------------------------------------
+
 
 class TestExtractPlainText(unittest.TestCase):
     """Tests for ingest_function.extractors.text_extractor."""
 
     def setUp(self):
         from ingest_function.extractors.text_extractor import extract_plain_text
+
         self.extract = extract_plain_text
 
     def test_returns_stripped_text(self):
@@ -44,9 +41,12 @@ class TestExtractEmailText(unittest.TestCase):
 
     def setUp(self):
         from ingest_function.extractors.email_extractor import extract_email_text
+
         self.extract = extract_email_text
 
-    def _make_email(self, subject: str, body: str, sender: str = "test@example.com") -> str:
+    def _make_email(
+        self, subject: str, body: str, sender: str = "test@example.com"
+    ) -> str:
         return (
             f"From: {sender}\r\n"
             f"Subject: {subject}\r\n"
@@ -91,11 +91,13 @@ class TestExtractPdfText(unittest.TestCase):
 
     def setUp(self):
         from ingest_function.extractors.pdf_extractor import extract_pdf_text
+
         self.extract = extract_pdf_text
 
     def test_missing_pypdf_raises_import_error(self):
         """If pypdf is not importable, a clear ImportError should be raised."""
         import sys
+
         with patch.dict(sys.modules, {"pypdf": None}):
             with self.assertRaises(ImportError):
                 self.extract(b"%PDF-fake")
@@ -139,11 +141,13 @@ class TestExtractPdfText(unittest.TestCase):
 # Formatter tests
 # ---------------------------------------------------------------------------
 
+
 class TestFormatAsText(unittest.TestCase):
     """Tests for ingest_function.formatters.text_formatter."""
 
     def setUp(self):
         from ingest_function.formatters.text_formatter import format_as_text
+
         self.fmt = format_as_text
 
     def test_contains_summary(self):
@@ -164,6 +168,7 @@ class TestFormatAsEmail(unittest.TestCase):
 
     def setUp(self):
         from ingest_function.formatters.email_formatter import format_as_email
+
         self.fmt = format_as_email
 
     def test_contains_summary(self):
@@ -191,11 +196,13 @@ class TestFormatAsEmail(unittest.TestCase):
 # Integration / ingest.py tests (mocked LLM)
 # ---------------------------------------------------------------------------
 
+
 class TestSummarizeDocument(unittest.TestCase):
     """End-to-end tests for summarize_document with a mocked summariser."""
 
     def setUp(self):
         from ingest_function.ingest import summarize_document
+
         self.fn = summarize_document
 
     def _mock_summarizer(self):

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 
-
 _SYSTEM_PROMPT = (
     "You are a highly skilled summarisation assistant. "
     "Read the provided document and produce a clear, concise summary that captures "

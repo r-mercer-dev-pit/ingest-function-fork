@@ -55,6 +55,7 @@ def extract_email_text(content: str | bytes) -> str:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _extract_body(msg: _email.message.Message) -> str:
     """Walk the MIME tree and return the best plain-text representation."""
     plain_parts: list[str] = []
@@ -101,7 +102,9 @@ def _strip_html(html: str) -> str:
     import re
 
     # Remove script/style blocks
-    html = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(
+        r"<(script|style)[^>]*>.*?</\1>", "", html, flags=re.DOTALL | re.IGNORECASE
+    )
     # Replace block-level tags with newlines
     html = re.sub(r"<(br|p|div|h[1-6]|li|tr)[^>]*>", "\n", html, flags=re.IGNORECASE)
     # Remove remaining tags
